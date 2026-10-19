@@ -13,7 +13,7 @@
   <key>CFBundleExecutable</key>
   <string>CADCraft</string>
   <key>CFBundleIdentifier</key>
-  <string>ai.storyteller.cadcraft</string>
+  <string>com.publik.cadcraft</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   <key>CFBundlePackageType</key>
