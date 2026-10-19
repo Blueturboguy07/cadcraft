@@ -714,6 +714,7 @@ dependencies = [
  "cadcraft-fonts",
  "cadcraft-geom",
  "cadcraft-render",
+ "craft-publik",
  "craft-ui",
  "egui",
  "egui-wgpu",
@@ -933,6 +934,15 @@ checksum = "7f8f80099a98041a3d1622845c271458a2d73e688351bf3cb999266764b81d48"
 name = "craft-docpath"
 version = "0.1.0"
 source = "git+https://github.com/storytold/craft-libs?rev=82a24b006eefa036b43c09a67fb9a3fbd17ffe63#82a24b006eefa036b43c09a67fb9a3fbd17ffe63"
+
+[[package]]
+name = "craft-publik"
+version = "0.1.0"
+dependencies = [
+ "egui",
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "craft-ui"

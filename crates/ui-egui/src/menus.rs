@@ -13,9 +13,13 @@ pub const OPEN_RECENT: &str = "Open Recent";
 const RECENT_ITEM: &str = "ui.recent.";
 const RECENT_CLEAR: &str = "ui.recent.clear";
 
+/// Tools ▸ AI...: the AI dialog (desktop only; the web build has no such menu item).
+pub const AI_COMMAND: &str = "ui.ai";
+
 /// UI-only commands: (id, label, menu path, shortcut).
 pub const UI_COMMANDS: &[(&str, &str, &[&str], Option<&str>)] = &[
     ("ui.spacemouse", "3D Mouse...", &["Tools", "3D Mouse..."], None),
+    (AI_COMMAND, "AI...", &["Tools", "AI..."], None),
     ("ui.spacemouse.calibrate", "Calibrate 3D Mouse", &[], None),
     ("ui.spacemouse.navigate", "3D Mouse Navigation", &[], None),
     ("ui.dock", "Arrange Panel", &[], None),
@@ -111,6 +115,11 @@ fn run_ui_command_inner(app: &mut CadApp, id: &str, params: &Value) -> Option<Re
     }
     if let Some(r) = crate::options::route(app, id, params) {
         return Some(r);
+    }
+    // Tools ▸ AI... or AI typed at the command line opens the AI dialog; nothing is sent until
+    // its Ask button is clicked. A JSON call to `ui.ai` reports the AI status.
+    if id == AI_COMMAND || (id == "ai" && params.is_null()) {
+        return Some(open_ai(app, params));
     }
     let toggle = |b: &mut bool, p: &Value| {
         *b = p.get("on").and_then(Value::as_bool).unwrap_or(!*b);
@@ -413,6 +422,16 @@ fn run_ui_command_inner(app: &mut CadApp, id: &str, params: &Value) -> Option<Re
     Some(r)
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+fn open_ai(app: &mut CadApp, params: &Value) -> Result<Value, String> {
+    crate::ai::route(app, params)
+}
+
+#[cfg(target_arch = "wasm32")]
+fn open_ai(_app: &mut CadApp, _params: &Value) -> Result<Value, String> {
+    Err("AI is available in the desktop app.".into())
+}
+
 /// SAVEAS parameters for a path picked in the Save dialog: a drawing that has no file yet is saved
 /// in the default save version; one opened from a file keeps that file's version.
 fn saveas_params(ui: &crate::UiState, session: &cadcraft_engine::Session, path: &str) -> Value {
@@ -503,7 +522,8 @@ pub fn tree(app: &CadApp) -> Vec<(String, Vec<Entry>)> {
         }
     }
     for (id, label, menu, sc) in UI_COMMANDS {
-        if !menu.is_empty() {
+        // The web build has no AI.
+        if !menu.is_empty() && !(cfg!(target_arch = "wasm32") && *id == AI_COMMAND) {
             add(menu, label, id, *sc, true);
         }
     }

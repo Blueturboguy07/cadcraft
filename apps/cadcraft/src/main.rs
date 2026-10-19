@@ -182,6 +182,19 @@ fn config_dir_from(var: impl Fn(&str) -> Option<std::ffi::OsString>) -> Option<s
     }
 }
 
+/// What publik needs to know about this build. The app token is public by design (it can only
+/// mint capped keys attributed to CADCraft) and lives at the repo root so source builds carry it.
+fn app_info() -> cadcraft_ui_egui::ai::AppInfo {
+    cadcraft_ui_egui::ai::AppInfo {
+        slug: "cadcraft",
+        name: "CADCraft",
+        version: env!("CARGO_PKG_VERSION"),
+        app_token: include_str!("../../../publik-app-token.txt"),
+        dialects: &["chat_completions"],
+        config_dir: config_dir(),
+    }
+}
+
 const APP_ID: &str = "ai.storyteller.cadcraft";
 
 /// Stencil bits of the window's render pass (see `NativeOptions::stencil_buffer`).
@@ -244,6 +257,12 @@ fn main() -> eframe::Result {
             }
             _ => files.push(a),
         }
+    }
+    // Builder check (publikhq.com/skills/setup.md): the built app provisions publik API for real
+    // and prints one line. The builder who runs it is the consent.
+    if std::env::var_os("PUBLIK_SELF_TEST").is_some() {
+        println!("{}", cadcraft_ui_egui::ai::self_test(&app_info()));
+        return Ok(());
     }
     // The log file lives under the settings directory; opened after the arguments, so `--version`
     // leaves no file behind. Records logged until now are written to it first.
@@ -338,6 +357,14 @@ fn main() -> eframe::Result {
                     log::warn!("no LISP support folder {}: {e}", support.display());
                 }
                 app.session.set_lisp_support_dir(Some(support));
+                // AI through publik API or the person's own key; the first launch asks once. Only
+                // with a settings folder (the choice is kept there), and a run an agent drives
+                // (--control) does not ask unasked: Tools ▸ AI... still offers it.
+                let mut ai = cadcraft_ui_egui::ai::Ai::new(app_info());
+                if control_port.is_some() {
+                    ai.skip_first_run();
+                }
+                app.ai = Some(ai);
             }
             app.integrated_titlebar = cfg!(target_os = "macos");
             if surface.present_mode == eframe::wgpu::PresentMode::AutoNoVsync {

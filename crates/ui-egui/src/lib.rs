@@ -8,6 +8,8 @@
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 #![forbid(unsafe_code)]
 
+#[cfg(not(target_arch = "wasm32"))]
+pub mod ai;
 pub mod aliasdlg;
 pub mod animation;
 pub mod autosave;
@@ -248,6 +250,11 @@ pub struct CadApp {
     pub hatch_dlg: Option<hatchdlg::HatchDlgState>,
     /// The Edit Block Definition dialog ([`bedit`]).
     pub bedit: bedit::State,
+    /// AI through publik API or the person's own key (desktop only). `None` until the host
+    /// installs it, and in tests and runs without a settings folder, where no setup dialog may
+    /// appear unasked.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub ai: Option<ai::Ai>,
 }
 
 impl CadApp {
@@ -288,6 +295,8 @@ impl CadApp {
             alias_dlg: None,
             hatch_dlg: None,
             bedit: bedit::State::default(),
+            #[cfg(not(target_arch = "wasm32"))]
+            ai: None,
         }
     }
 
@@ -586,6 +595,9 @@ impl CadApp {
         self.gpu_fault_tick(ctx);
         managers::plot_window_resume(self, ctx);
         hatchdlg::resume(self);
+        // AI answers that arrived, and the first-launch AI setup once the window is up.
+        #[cfg(not(target_arch = "wasm32"))]
+        ai::frame(self, ctx);
         self.autosave_tick(ctx);
         menus::shortcuts(self, ctx);
         #[cfg(not(target_arch = "wasm32"))]

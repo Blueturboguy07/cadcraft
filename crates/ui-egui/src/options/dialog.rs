@@ -11,22 +11,28 @@ use crate::CadApp;
 use crate::animation::AnimationPref;
 use crate::theme::{ThemePref, Tokens};
 
-/// The tabs: (id in the dialog name, label).
-pub(super) const TABS: [(&str, &str); 6] = [
+/// The tabs: (id in the dialog name, label). The web build has no AI tab ([`shown_tabs`]).
+pub(super) const TABS: [(&str, &str); 7] = [
     ("display", "Display"),
     ("files", "Open and Save"),
     ("drafting", "Drafting"),
     ("selection", "Selection"),
     ("preferences", "User Preferences"),
     ("profiles", "Profiles"),
+    ("ai", "AI"),
 ];
+
+/// The tabs this build shows.
+fn shown_tabs() -> impl Iterator<Item = &'static (&'static str, &'static str)> {
+    TABS.iter().filter(|(id, _)| cfg!(not(target_arch = "wasm32")) || *id != "ai")
+}
 
 const WIDTH: f32 = 580.0;
 const MIN_TAB_HEIGHT: f32 = 200.0;
 
 /// Show the Options dialog (`name` is `"options"` or `"options:<tab>"`).
 pub fn dialog(app: &mut CadApp, ctx: &egui::Context, name: &str, open: &mut bool) {
-    let tab = name.strip_prefix("options:").and_then(|t| TABS.iter().find(|(id, _)| *id == t)).map_or("display", |(id, _)| *id);
+    let tab = name.strip_prefix("options:").and_then(|t| shown_tabs().find(|(id, _)| *id == t)).map_or("display", |(id, _)| *id);
     let mut changes = Map::new();
     let mut next_tab = None;
     let mut start = None;
@@ -42,7 +48,7 @@ pub fn dialog(app: &mut CadApp, ctx: &egui::Context, name: &str, open: &mut bool
         .show(ctx, |ui| {
             ui.set_width(WIDTH);
             ui.horizontal_wrapped(|ui| {
-                for (id, label) in TABS {
+                for &(id, label) in shown_tabs() {
                     if ui.selectable_label(tab == id, crate::i18n::t(label)).clicked() {
                         next_tab = Some(id);
                     }
@@ -57,6 +63,7 @@ pub fn dialog(app: &mut CadApp, ctx: &egui::Context, name: &str, open: &mut bool
                 "selection" => selection(app, ui, &mut changes),
                 "preferences" => preferences(app, ui, &mut changes),
                 "profiles" => profiles(app, ui, &mut changes),
+                "ai" => ai(app, ui),
                 _ => display(app, ui, &mut changes),
             }
             // The same height on every tab, so switching tabs doesn't move the buttons.
@@ -490,6 +497,14 @@ fn preferences(app: &CadApp, ui: &mut egui::Ui, changes: &mut Map<String, Value>
         changes.insert("timeSensitiveRightClick".into(), json!(timed));
     }
     hint(ui, crate::tl!("Turned off, a right-click while a command runs always opens the shortcut menu."));
+}
+
+/// AI: publik API or the person's own key, for Tools ▸ AI... (desktop only).
+fn ai(app: &mut CadApp, ui: &mut egui::Ui) {
+    #[cfg(not(target_arch = "wasm32"))]
+    crate::ai::options_section(app, ui);
+    #[cfg(target_arch = "wasm32")]
+    let _ = (app, ui);
 }
 
 fn profiles(app: &CadApp, ui: &mut egui::Ui, changes: &mut Map<String, Value>) {
