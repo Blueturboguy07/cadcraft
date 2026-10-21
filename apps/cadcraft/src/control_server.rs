@@ -305,11 +305,21 @@ mod tests {
     fn a_line_that_is_not_a_request_closes_the_connection() {
         for junk in [&b"hello\n"[..], b"[1,2]\n", b"{\"id\":1}\n", b"{\"method\":5}\n", b"\xff\xfe\n", b"GET /x HTTP/1.1\n"] {
             let addr = serve_echo();
-            let mut input = junk.to_vec();
-            input.extend_from_slice(b"{\"id\":2,\"method\":\"ping\"}\n");
-            let replies = exchange(addr, &input);
-            assert_eq!(replies.len(), 1, "{replies:?}");
-            assert_eq!(replies[0]["ok"], false);
+            let mut c = TcpStream::connect(addr).unwrap();
+            c.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+            c.write_all(junk).unwrap();
+            // The reply is read before the follow-up request goes out. The server closes as
+            // soon as it has answered, and a close with unread input resets the connection,
+            // which can drop that reply on the floor: with both lines sent up front this
+            // test failed now and then.
+            let mut r = BufReader::new(c);
+            let mut line = String::new();
+            r.read_line(&mut line).unwrap();
+            let first: Value = serde_json::from_str(&line).unwrap();
+            assert_eq!(first["ok"], false, "{line}");
+            let _ = r.get_mut().write_all(b"{\"id\":2,\"method\":\"ping\"}\n");
+            let mut rest = String::new();
+            assert_eq!(r.read_line(&mut rest).unwrap_or(0), 0, "{rest}");
         }
         assert!(is_http_request_line("OPTIONS * HTTP/1.1"));
         assert!(is_http_request_line("PRI * HTTP/2.0"));
