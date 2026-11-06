@@ -24,6 +24,9 @@ mod native_menu;
 mod spacemouse;
 mod system_animations;
 mod workspace;
+// publik's usage counts (README: Usage counts). The file is publik's reference client, kept as it is.
+#[rustfmt::skip]
+mod publik_telemetry;
 
 use cadcraft_engine::Session;
 use cadcraft_ui_egui::{CadApp, Services, i18n};
@@ -238,6 +241,12 @@ fn control_flag(current: Option<u16>, value: Option<String>) -> Option<u16> {
     current
 }
 
+/// The version in publik's usage counts: the release tag without its `v`, for example `0.9.0-publik.4`.
+/// The build number comes from `packaging/PUBLIK_BUILD`, the file the bundle version comes from.
+fn publik_version() -> String {
+    format!("{}-publik.{}", env!("CARGO_PKG_VERSION"), include_str!("../../../packaging/PUBLIK_BUILD").trim())
+}
+
 fn main() -> eframe::Result {
     // First, so every start-up record is captured; see `logging`.
     let logger = logging::install();
@@ -264,6 +273,9 @@ fn main() -> eframe::Result {
         println!("{}", cadcraft_ui_egui::ai::self_test(&app_info()));
         return Ok(());
     }
+    // publik's usage counts: `app_opened` now, `active_session` every 30 minutes, on a background
+    // thread. After the early exits above, so `--version` and the self-test send nothing.
+    publik_telemetry::start("cadcraft", &publik_version(), None);
     // The log file lives under the settings directory; opened after the arguments, so `--version`
     // leaves no file behind. Records logged until now are written to it first.
     if let Some(logger) = logger {

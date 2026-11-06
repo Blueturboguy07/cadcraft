@@ -11,6 +11,8 @@ default-run = "cadcraft"
 workspace = true
 
 [dependencies]
+# publik's usage counts (src/publik_telemetry.rs): the HTTP client that file needs.
+ureq = "2"
 cadcraft-engine = { workspace = true }
 cadcraft-ui-egui = { workspace = true }
 cadcraft-io = { workspace = true }
