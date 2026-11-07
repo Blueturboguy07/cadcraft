@@ -206,7 +206,7 @@ pub fn route(app: &mut CadApp, params: &Value) -> Result<Value, String> {
 
 fn window<'a>(ctx: &egui::Context, id: &str) -> egui::Window<'a> {
     egui::Window::new(crate::i18n::t("AI"))
-        .id(egui::Id::new(id))
+        .id(egui::Id::unique(id))
         .resizable(false)
         .collapsible(false)
         .pivot(egui::Align2::CENTER_CENTER)
