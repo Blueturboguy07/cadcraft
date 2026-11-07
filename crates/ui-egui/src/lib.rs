@@ -13,8 +13,14 @@ pub mod ai;
 
 /// CADCraft as craft-update knows it, with its 128 px icon and accent colour: the update
 /// prompt shows both, and an AppImage's menu entry gets the icon.
+///
+/// publik's build: the update check reads publik's fork, never storytold/cadcraft, so this build
+/// never downloads or installs a build that is not publik's. publik tags its builds
+/// `vX.Y.Z-publik.N`, which the check skips as pre-releases: it offers nothing, and publik's
+/// launcher updates the app.
 #[cfg(not(target_arch = "wasm32"))]
 pub const UPDATE_APP: craft_update::app::App = craft_update::app::App {
+    repo: "Blueturboguy07/cadcraft",
     icon_png: Some(include_bytes!("../../../assets/app-icon/hicolor/128x128/apps/ai.storyteller.cadcraft.png")),
     accent: Some([0x3e, 0xa6, 0xe8]),
     ..craft_update::suite::CADCRAFT
