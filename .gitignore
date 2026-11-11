@@ -9,3 +9,6 @@
 *.swp
 /apps/cadcraft-web/dist/
 /.claude/worktrees/
+
+# The publik app token comes from the build secret PUBLIK_APP_TOKEN, never from git.
+publik-app-token.txt
