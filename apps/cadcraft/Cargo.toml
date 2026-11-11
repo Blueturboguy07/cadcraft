@@ -12,8 +12,9 @@ default-run = "cadcraft"
 workspace = true
 
 [dependencies]
-# publik's usage counts (src/publik_telemetry.rs): the HTTP client that file needs.
-ureq = "2"
+# The publik module (pinned in the root Cargo.toml): Sign in with publik at start-up (`src/publik.rs`),
+# usage counting, and the AI pay choice.
+craft-publik = { workspace = true }
 cadcraft-engine = { workspace = true }
 cadcraft-ui-egui = { workspace = true }
 cadcraft-io = { workspace = true }

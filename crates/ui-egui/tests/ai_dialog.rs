@@ -1,6 +1,7 @@
 //! Tools ▸ AI... (desktop): the AI dialog opens from the menu or with AI typed at the command line,
-//! a JSON call never opens it, the first launch asks once (not in a run an agent drives), and
-//! Options ▸ AI holds the AI section. Nothing here sends a request.
+//! a JSON call never opens it, the first launch asks nothing before the publik gate passed (and
+//! never in a run an agent drives), and Options ▸ AI holds the AI section. Nothing here sends a
+//! request.
 #![cfg(not(target_arch = "wasm32"))]
 
 use cadcraft_engine::Session;
@@ -20,6 +21,8 @@ fn test_ai() -> Ai {
         name: "CADCraft",
         version: "0.0.0",
         app_token: "",
+        uses_ai: true,
+        endpoints: craft_publik::Endpoints::DEFAULT,
         dialects: &["chat_completions"],
         config_dir: None,
     })
@@ -94,24 +97,23 @@ fn without_ai_the_dialog_and_options_say_it_is_off() {
 }
 
 #[test]
-fn the_first_launch_asks_once_and_an_agent_run_does_not() {
+fn the_first_launch_waits_for_the_gate_and_an_agent_run_does_not_ask() {
     if key_in_environment() {
         return;
     }
     let ctx = egui::Context::default();
+    // Sign in with publik comes first: until the gate passed (it never does in a test), the first
+    // launch asks nothing, however many frames go by.
     let mut a = app();
     a.ai = Some(test_ai());
-    render(&mut a, &ctx);
-    assert!(a.ui.dialog.is_none(), "not before the window is up");
-    render(&mut a, &ctx);
-    assert_eq!(a.ui.dialog.as_deref(), Some("aiSetup"));
-    assert!(render(&mut a, &ctx).contains("Your own key"));
-    // Closed: it does not come back in this run.
-    a.ui.dialog = None;
-    for _ in 0..3 {
+    for _ in 0..4 {
         render(&mut a, &ctx);
     }
-    assert!(a.ui.dialog.is_none());
+    assert!(a.ui.dialog.is_none(), "nothing asks before the gate passed");
+    // The setup flow the gate's "Use my own key" hands over still offers the person's own key.
+    a.ai.as_mut().unwrap().state.begin();
+    a.ui.dialog = Some("aiSetup".into());
+    assert!(render(&mut a, &ctx).contains("Your own key"));
 
     let mut a = app();
     let mut ai = test_ai();

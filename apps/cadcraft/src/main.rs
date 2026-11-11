@@ -26,9 +26,9 @@ mod native_menu;
 mod spacemouse;
 mod system_animations;
 mod workspace;
-// publik's usage counts (README: Usage counts). The file is publik's reference client, kept as it is.
-#[rustfmt::skip]
-mod publik_telemetry;
+// Sign in with publik, usage counting and the AI pay choice: this build's publik facts and the
+// gate every publik app opens with.
+mod publik;
 
 use cadcraft_engine::Session;
 use cadcraft_ui_egui::switch::Switch;
@@ -36,6 +36,8 @@ use cadcraft_ui_egui::{CadApp, Services, i18n};
 
 struct App {
     cad: CadApp,
+    /// Sign in with publik: drawn before anything of the app until it passes.
+    gate: craft_publik::ui::Gate,
     spacemouse: spacemouse::SpaceMouse,
     /// The desktop's light/dark choice where winit reports none (Linux, the BSDs).
     desktop_theme: desktop_theme::DesktopTheme,
@@ -119,6 +121,11 @@ impl eframe::App for App {
         cadcraft_ui_egui::cmdline::capture_tab(ctx, raw);
     }
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        // Sign in with publik comes first: the gate draws itself until the person is signed in
+        // (and, the first time, has chosen how the app pays for AI). Nothing of the app shows before.
+        if !self.gate.ui(ui) {
+            return;
+        }
         self.cad.guarded_ui(ui);
         #[cfg(target_os = "macos")]
         craft_window::title_bar::sync_movable(ui.ctx(), &mut self.movable);
@@ -239,20 +246,6 @@ fn window_options(restoring: bool) -> eframe::NativeOptions {
     }
 }
 
-/// What publik needs to know about this build. The app token is public by design (it can only
-/// mint capped keys attributed to CADCraft) and lives at the repo root so source builds carry it.
-/// `config_dir`: the settings folder of this run (`Env::config_dir`).
-fn app_info(config_dir: Option<std::path::PathBuf>) -> cadcraft_ui_egui::ai::AppInfo {
-    cadcraft_ui_egui::ai::AppInfo {
-        slug: "cadcraft",
-        name: "CADCraft",
-        version: env!("CARGO_PKG_VERSION"),
-        app_token: include_str!("../../../publik-app-token.txt"),
-        dialects: &["chat_completions"],
-        config_dir,
-    }
-}
-
 const APP_ID: &str = "ai.storyteller.cadcraft";
 
 /// The key eframe saves the main window state under in its storage.
@@ -272,12 +265,6 @@ fn app_icon() -> Option<egui::IconData> {
 
 fn version_string() -> String {
     format!("cadcraft {}", cadcraft_engine::build_version())
-}
-
-/// The version in publik's usage counts: the release tag without its `v`, for example `0.18.0-publik.6`.
-/// The build number comes from `packaging/PUBLIK_BUILD`, the file the bundle version comes from.
-fn publik_version() -> String {
-    format!("{}-publik.{}", env!("CARGO_PKG_VERSION"), include_str!("../../../packaging/PUBLIK_BUILD").trim())
 }
 
 /// Parse CLI options (`--control`, `--sample`, files, `--version`), install logging and I/O hooks, build the services and app, and run eframe.
@@ -307,13 +294,12 @@ fn main() -> eframe::Result {
     // Builder check (publikhq.com/skills/setup.md): the built app provisions publik API for real
     // and prints one line. The builder who runs it is the consent.
     if std::env::var_os("PUBLIK_SELF_TEST").is_some() {
-        println!("{}", cadcraft_ui_egui::ai::self_test(&app_info(vars.config_dir.clone())));
+        println!("{}", craft_publik::self_test(&publik::app_info(vars.config_dir.clone())));
         return Ok(());
     }
-    // publik's usage counts: `app_opened` now, `active_session` every 30 minutes, on a background
-    // thread. After the early exits above (the DWG worker, the update helper, `--help`, `--version`,
-    // usage errors and the self-test), so none of them sends anything.
-    publik_telemetry::start("cadcraft", &publik_version(), None);
+    // publik's usage counts (`app_opened` now, `active_session` every 30 minutes) start once the
+    // gate passed (`publik::app_info`, `craft_publik::ui::Gate`), so the early exits above (the DWG
+    // worker, the update helper, `--help`, `--version`, usage errors and the self-test) send nothing.
     // The log file lives under the settings directory; opened after the arguments, so `--version`
     // leaves no file behind. Records logged until now are written to it first.
     if let Some(logger) = logger {
@@ -420,7 +406,7 @@ fn main() -> eframe::Result {
                 // AI through publik API or the person's own key; the first launch asks once. Only
                 // with a settings folder (the choice is kept there), and a run an agent drives
                 // (--control) does not ask unasked: Tools ▸ AI... still offers it.
-                let mut ai = cadcraft_ui_egui::ai::Ai::new(app_info(Some(dir.clone())));
+                let mut ai = cadcraft_ui_egui::ai::Ai::new(publik::app_info(Some(dir.clone())));
                 if control_port.is_some() {
                     ai.skip_first_run();
                 }
@@ -456,6 +442,8 @@ fn main() -> eframe::Result {
                 desktop_theme,
                 system_animations,
                 cad: app,
+                // Sign in with publik: provisioning starts now, on a worker thread; `ui` draws it.
+                gate: craft_publik::ui::Gate::new(publik::app_info(vars.config_dir.clone())),
                 spacemouse: spacemouse::SpaceMouse::start(cc.egui_ctx.clone()),
                 workspace,
                 workspace_error,

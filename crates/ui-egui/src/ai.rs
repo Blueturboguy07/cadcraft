@@ -165,12 +165,14 @@ pub fn frame(app: &mut CadApp, ctx: &egui::Context) {
     let Some(ai) = app.ai.as_mut() else { return };
     ai.state.poll();
     ai.ask.poll(&mut ai.state);
-    // The first launch asks once the window is up (a few frames in). "Later" ends that for good.
+    // The first launch asks once the publik gate passed and the window is up (a few frames in):
+    // after "Use my own key" at the gate, the own-key form. "Later" ends that for good.
     if !ai.first_run_checked {
         ai.frames = ai.frames.saturating_add(1);
         ctx.request_repaint();
-        if ai.frames > 3 {
+        if ai.frames > 3 && craft_publik::gate::passed() {
             ai.first_run_checked = true;
+            ai.state.reload_credential(); // the gate wrote it after this state was created
             if ai.state.wants_first_run() || ai.state.owes_first_card() {
                 ai.open_setup = true;
             }
@@ -257,7 +259,7 @@ pub fn dialog(app: &mut CadApp, ctx: &egui::Context, open: &mut bool) {
             return;
         };
         if !ai.state.provider().is_set_up() {
-            ui.label("AI is not set up. Set it up first: publik API, with no key to paste, or your own key.");
+            ui.label("AI is not set up. Set it up first: connect your publik plan (no key to paste) or use your own key.");
             ui.add_space(8.0);
             ui.horizontal(|ui| {
                 setup = ui.button("Set up AI...").clicked();
@@ -782,6 +784,8 @@ mod tests {
             name: "CADCraft",
             version: "0.0.0",
             app_token: "",
+            uses_ai: true,
+            endpoints: craft_publik::Endpoints::DEFAULT,
             dialects: &["chat_completions"],
             config_dir: None,
         });
